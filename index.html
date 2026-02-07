@@ -1,0 +1,1112 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>그래프 픽셀 추출기 / Graph Pixel Extractor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .main {
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            min-height: 600px;
+        }
+
+        .sidebar {
+            background: #f8f9fa;
+            border-right: 1px solid #e0e0e0;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .section {
+            margin-bottom: 20px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .section:last-child {
+            border-bottom: none;
+        }
+
+        .section h3 {
+            font-size: 15px;
+            margin-bottom: 12px;
+            color: #333;
+            font-weight: 600;
+        }
+
+        .input-group {
+            margin-bottom: 12px;
+        }
+
+        .input-group label {
+            display: block;
+            font-size: 13px;
+            color: #555;
+            margin-bottom: 6px;
+            font-weight: 500;
+        }
+
+        .input-group input, .input-group select {
+            width: 100%;
+            padding: 8px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 13px;
+            transition: border-color 0.3s;
+        }
+
+        .input-group input:focus, .input-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .upload-zone {
+            border: 3px dashed #ddd;
+            border-radius: 12px;
+            padding: 30px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: #fafafa;
+            margin-bottom: 15px;
+        }
+
+        .upload-zone:hover {
+            border-color: #667eea;
+            background: #f0f4ff;
+        }
+
+        .upload-zone.dragover {
+            border-color: #667eea;
+            background: #e3ebff;
+            transform: scale(1.02);
+        }
+
+        .upload-icon {
+            font-size: 40px;
+            margin-bottom: 10px;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-success {
+            background: #27ae60;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #229954;
+        }
+
+        .btn-secondary {
+            background: #95a5a6;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #7f8c8d;
+        }
+
+        .btn-danger {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c0392b;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 15px;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .result-section {
+            display: none;
+        }
+
+        .result-section.active {
+            display: block;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 12px;
+            border-radius: 6px;
+            border: 2px solid #e0e0e0;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            color: #666;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+
+        .stat-value {
+            font-size: 20px;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .error {
+            background: #fee;
+            color: #c00;
+            padding: 12px;
+            border-radius: 6px;
+            margin-top: 10px;
+            display: none;
+            font-size: 13px;
+        }
+
+        .error.active {
+            display: block;
+        }
+
+        .info-box {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            padding: 10px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+            font-size: 12px;
+            color: #0d47a1;
+        }
+
+        .content-area {
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        .color-picker-group {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .color-picker-group input[type="color"] {
+            height: 40px;
+            padding: 2px;
+            cursor: pointer;
+        }
+
+        .color-picker-group input[type="number"] {
+            text-align: center;
+        }
+
+        .slider-group {
+            margin-bottom: 10px;
+        }
+
+        .slider-group label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 4px;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: #e0e0e0;
+            outline: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #667eea;
+            cursor: pointer;
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #667eea;
+            cursor: pointer;
+            border: none;
+        }
+
+        .canvas-wrapper {
+            position: relative;
+            display: inline-block;
+        }
+
+        #mainCanvas, #overlayCanvas {
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        #overlayCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔍 그래프 픽셀 추출기</h1>
+            <p>픽셀 단위 정밀 분석으로 그래프를 SVG로 변환</p>
+        </div>
+
+        <div class="main">
+            <div class="sidebar">
+                <!-- Upload -->
+                <div class="section">
+                    <h3>📁 이미지 업로드</h3>
+                    <div class="upload-zone" id="uploadZone">
+                        <div class="upload-icon">📊</div>
+                        <div style="font-size: 13px; font-weight: 500;">클릭 또는 드래그</div>
+                        <input type="file" id="fileInput" accept="image/*">
+                    </div>
+                </div>
+
+                <!-- Settings -->
+                <div class="section">
+                    <h3>⚙️ 추출 설정</h3>
+                    
+                    <div class="input-group">
+                        <label>🎨 선 색상</label>
+                        <div class="color-picker-group">
+                            <input type="color" id="targetColor" value="#ff0000">
+                            <input type="number" id="colorTolerance" value="40" min="0" max="100" placeholder="허용오차" title="색상 허용 오차">
+                        </div>
+                        <small style="color: #666; font-size: 11px;">색상 선택 후 허용오차 조정 (기본: 40)</small>
+                    </div>
+
+                    <div class="input-group">
+                        <label>📏 샘플링 간격</label>
+                        <select id="samplingInterval">
+                            <option value="0.1">0.1픽셀 (극초정밀 - 매우 느림)</option>
+                            <option value="0.25">0.25픽셀 (극정밀)</option>
+                            <option value="0.5">0.5픽셀 (서브픽셀 정밀)</option>
+                            <option value="1">1픽셀마다 (초정밀)</option>
+                            <option value="2" selected>2픽셀마다 (정밀)</option>
+                            <option value="5">5픽셀마다 (빠름)</option>
+                        </select>
+                    </div>
+
+                    <div class="input-group">
+                        <label>📈 곡선 보간</label>
+                        <select id="interpolation">
+                            <option value="none">없음 (원본 그대로)</option>
+                            <option value="linear">선형 보간 (2배)</option>
+                            <option value="catmull" selected>Catmull-Rom (4배)</option>
+                            <option value="bezier">베지어 곡선 (8배)</option>
+                        </select>
+                    </div>
+
+                    <div class="input-group">
+                        <label>🔍 스캔 방향</label>
+                        <select id="scanDirection">
+                            <option value="horizontal">수평 (좌→우)</option>
+                            <option value="vertical">수직 (상→하)</option>
+                        </select>
+                    </div>
+
+                    <div class="info-box">
+                        <strong>💡 팁:</strong><br>
+                        • 빨간색 차트 → 색상: #ff0000<br>
+                        • 분홍색 차트 → 색상: #ff69b4<br>
+                        • 파란색 차트 → 색상: #0000ff<br>
+                        <br>
+                        <strong>🎯 정밀도:</strong><br>
+                        • 0.1픽셀 = 10,000+ 포인트<br>
+                        • 0.25픽셀 = 4,000+ 포인트<br>
+                        • Catmull-Rom = 부드러운 곡선<br>
+                        • 베지어 = 매우 부드러운 곡선
+                    </div>
+                </div>
+
+                <!-- Extract Button -->
+                <div class="section">
+                    <button class="btn btn-primary" id="extractBtn" disabled>
+                        🚀 그래프 추출 시작
+                    </button>
+                    <div class="loading" id="loading">
+                        <div class="spinner"></div>
+                        <p style="font-size: 12px;">픽셀 분석 중...</p>
+                    </div>
+                </div>
+
+                <!-- Results -->
+                <div class="section result-section" id="resultSection">
+                    <h3>✅ 추출 완료</h3>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-label">포인트 수</div>
+                            <div class="stat-value" id="pointCount">0</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">정밀도</div>
+                            <div class="stat-value" id="precision" style="font-size: 14px;">-</div>
+                        </div>
+                    </div>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-label">Y 범위</div>
+                            <div class="stat-value" id="yRange" style="font-size: 14px;">-</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">X 범위</div>
+                            <div class="stat-value" id="xRange" style="font-size: 14px;">-</div>
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <label>SVG 선 색상</label>
+                        <input type="color" id="svgLineColor" value="#e74c3c">
+                    </div>
+
+                    <div class="input-group">
+                        <label>SVG 선 두께</label>
+                        <input type="number" id="svgLineWidth" value="2" min="0.5" max="10" step="0.5">
+                    </div>
+
+                    <button class="btn btn-success" onclick="downloadSVG()">
+                        ⬇ SVG 다운로드
+                    </button>
+                    <button class="btn btn-success" onclick="downloadPSD()">
+                        🎨 PSD 다운로드 (Photopea)
+                    </button>
+                    <button class="btn btn-secondary" onclick="downloadJSON()">
+                        📄 JSON 다운로드
+                    </button>
+                    <button class="btn btn-secondary" onclick="copyData()">
+                        📋 데이터 복사
+                    </button>
+                    <button class="btn btn-danger" onclick="clearGraph()">
+                        🗑️ 그려진 그래프 지우기
+                    </button>
+                    <button class="btn btn-secondary" onclick="resetAll()">
+                        🔄 전체 초기화
+                    </button>
+                </div>
+
+                <div class="error" id="error"></div>
+            </div>
+
+            <div class="content-area">
+                <div class="canvas-wrapper" id="canvasWrapper">
+                    <canvas id="mainCanvas"></canvas>
+                    <canvas id="overlayCanvas"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let imageData = null;
+        let extractedData = null;
+        let mainCanvas, overlayCanvas, mainCtx, overlayCtx;
+
+        window.onload = function() {
+            mainCanvas = document.getElementById('mainCanvas');
+            overlayCanvas = document.getElementById('overlayCanvas');
+            mainCtx = mainCanvas.getContext('2d', { willReadFrequently: true });
+            overlayCtx = overlayCanvas.getContext('2d');
+
+            setupEventListeners();
+        };
+
+        function setupEventListeners() {
+            const uploadZone = document.getElementById('uploadZone');
+            const fileInput = document.getElementById('fileInput');
+
+            uploadZone.addEventListener('click', () => fileInput.click());
+            fileInput.addEventListener('change', handleFileSelect);
+
+            uploadZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadZone.classList.add('dragover');
+            });
+
+            uploadZone.addEventListener('dragleave', () => {
+                uploadZone.classList.remove('dragover');
+            });
+
+            uploadZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadZone.classList.remove('dragover');
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    handleFile(files[0]);
+                }
+            });
+
+            document.getElementById('extractBtn').addEventListener('click', extractGraph);
+        }
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                handleFile(file);
+            }
+        }
+
+        function handleFile(file) {
+            if (!file.type.startsWith('image/')) {
+                showError('이미지 파일만 업로드 가능합니다.');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    displayImage(img);
+                    document.getElementById('extractBtn').disabled = false;
+                    hideError();
+                };
+                img.onerror = function() {
+                    showError('이미지 로딩 실패');
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function displayImage(img) {
+            const maxWidth = 1000;
+            const maxHeight = 800;
+            let width = img.width;
+            let height = img.height;
+
+            if (width > maxWidth) {
+                height = (maxWidth / width) * height;
+                width = maxWidth;
+            }
+            if (height > maxHeight) {
+                width = (maxHeight / height) * width;
+                height = maxHeight;
+            }
+
+            mainCanvas.width = width;
+            mainCanvas.height = height;
+            overlayCanvas.width = width;
+            overlayCanvas.height = height;
+
+            mainCtx.clearRect(0, 0, width, height);
+            mainCtx.drawImage(img, 0, 0, width, height);
+            
+            imageData = mainCtx.getImageData(0, 0, width, height);
+        }
+
+        async function extractGraph() {
+            if (!imageData) {
+                showError('먼저 이미지를 업로드하세요.');
+                return;
+            }
+
+            showLoading(true);
+            hideError();
+
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            try {
+                const targetColor = hexToRgb(document.getElementById('targetColor').value);
+                const tolerance = parseInt(document.getElementById('colorTolerance').value);
+                const samplingInterval = parseFloat(document.getElementById('samplingInterval').value);
+                const scanDirection = document.getElementById('scanDirection').value;
+                const interpolationType = document.getElementById('interpolation').value;
+
+                const points = [];
+                const width = imageData.width;
+                const height = imageData.height;
+
+                if (scanDirection === 'horizontal') {
+                    for (let x = 0; x < width; x += samplingInterval) {
+                        let bestY = -1;
+                        let bestMatch = Infinity;
+
+                        for (let y = 0; y < height; y++) {
+                            const color = getPixelColor(x, y);
+                            const diff = colorDistance(color, targetColor);
+                            
+                            if (diff < tolerance && diff < bestMatch) {
+                                bestMatch = diff;
+                                bestY = y;
+                            }
+                        }
+
+                        if (bestY !== -1) {
+                            points.push({ x: x, y: bestY });
+                        }
+                    }
+                } else {
+                    for (let y = 0; y < height; y += samplingInterval) {
+                        let bestX = -1;
+                        let bestMatch = Infinity;
+
+                        for (let x = 0; x < width; x++) {
+                            const color = getPixelColor(x, y);
+                            const diff = colorDistance(color, targetColor);
+                            
+                            if (diff < tolerance && diff < bestMatch) {
+                                bestMatch = diff;
+                                bestX = x;
+                            }
+                        }
+
+                        if (bestX !== -1) {
+                            points.push({ x: bestX, y: y });
+                        }
+                    }
+                }
+
+                if (points.length === 0) {
+                    showError('그래프를 찾을 수 없습니다. 색상과 허용오차를 조정해보세요.');
+                    showLoading(false);
+                    return;
+                }
+
+                const interpolatedPoints = interpolatePoints(points, interpolationType);
+
+                const yValues = interpolatedPoints.map(p => p.y);
+                const xValues = interpolatedPoints.map(p => p.x);
+
+                extractedData = {
+                    points: interpolatedPoints,
+                    yMin: Math.min(...yValues),
+                    yMax: Math.max(...yValues),
+                    xMin: Math.min(...xValues),
+                    xMax: Math.max(...xValues),
+                    width: width,
+                    height: height
+                };
+
+                displayResults();
+                showLoading(false);
+            } catch (error) {
+                showError('추출 중 오류 발생: ' + error.message);
+                showLoading(false);
+            }
+        }
+
+        function getPixelColor(x, y) {
+            const ix = Math.floor(x);
+            const iy = Math.floor(y);
+            
+            if (ix < 0 || ix >= imageData.width || iy < 0 || iy >= imageData.height) {
+                return { r: 0, g: 0, b: 0 };
+            }
+
+            if (x === ix && y === iy) {
+                const idx = (iy * imageData.width + ix) * 4;
+                return {
+                    r: imageData.data[idx],
+                    g: imageData.data[idx + 1],
+                    b: imageData.data[idx + 2]
+                };
+            }
+
+            return bilinearInterpolate(x, y);
+        }
+
+        function colorDistance(c1, c2) {
+            const dr = c1.r - c2.r;
+            const dg = c1.g - c2.g;
+            const db = c1.b - c2.b;
+            return Math.sqrt(dr * dr + dg * dg + db * db);
+        }
+
+        function bilinearInterpolate(x, y) {
+            const x0 = Math.floor(x);
+            const y0 = Math.floor(y);
+            const x1 = Math.min(x0 + 1, imageData.width - 1);
+            const y1 = Math.min(y0 + 1, imageData.height - 1);
+
+            const fx = x - x0;
+            const fy = y - y0;
+
+            const idx00 = (y0 * imageData.width + x0) * 4;
+            const idx10 = (y0 * imageData.width + x1) * 4;
+            const idx01 = (y1 * imageData.width + x0) * 4;
+            const idx11 = (y1 * imageData.width + x1) * 4;
+
+            const r = (1 - fx) * (1 - fy) * imageData.data[idx00] +
+                     fx * (1 - fy) * imageData.data[idx10] +
+                     (1 - fx) * fy * imageData.data[idx01] +
+                     fx * fy * imageData.data[idx11];
+
+            const g = (1 - fx) * (1 - fy) * imageData.data[idx00 + 1] +
+                     fx * (1 - fy) * imageData.data[idx10 + 1] +
+                     (1 - fx) * fy * imageData.data[idx01 + 1] +
+                     fx * fy * imageData.data[idx11 + 1];
+
+            const b = (1 - fx) * (1 - fy) * imageData.data[idx00 + 2] +
+                     fx * (1 - fy) * imageData.data[idx10 + 2] +
+                     (1 - fx) * fy * imageData.data[idx01 + 2] +
+                     fx * fy * imageData.data[idx11 + 2];
+
+            return { r: Math.round(r), g: Math.round(g), b: Math.round(b) };
+        }
+
+        function interpolatePoints(points, type) {
+            if (points.length < 2) return points;
+
+            const interpolated = [];
+
+            for (let i = 0; i < points.length - 1; i++) {
+                const p0 = points[i];
+                const p1 = points[i + 1];
+
+                interpolated.push(p0);
+
+                if (type === 'linear') {
+                    const mid = {
+                        x: (p0.x + p1.x) / 2,
+                        y: (p0.y + p1.y) / 2
+                    };
+                    interpolated.push(mid);
+                } else if (type === 'catmull') {
+                    const pMinus1 = i > 0 ? points[i - 1] : p0;
+                    const p2 = i < points.length - 2 ? points[i + 2] : p1;
+
+                    for (let t = 0.25; t < 1; t += 0.25) {
+                        const t2 = t * t;
+                        const t3 = t2 * t;
+
+                        const x = 0.5 * (
+                            (2 * p0.x) +
+                            (-pMinus1.x + p1.x) * t +
+                            (2 * pMinus1.x - 5 * p0.x + 4 * p1.x - p2.x) * t2 +
+                            (-pMinus1.x + 3 * p0.x - 3 * p1.x + p2.x) * t3
+                        );
+
+                        const y = 0.5 * (
+                            (2 * p0.y) +
+                            (-pMinus1.y + p1.y) * t +
+                            (2 * pMinus1.y - 5 * p0.y + 4 * p1.y - p2.y) * t2 +
+                            (-pMinus1.y + 3 * p0.y - 3 * p1.y + p2.y) * t3
+                        );
+
+                        interpolated.push({ x, y });
+                    }
+                } else if (type === 'bezier') {
+                    for (let t = 0.125; t < 1; t += 0.125) {
+                        const x = (1 - t) * (1 - t) * p0.x + 2 * (1 - t) * t * ((p0.x + p1.x) / 2) + t * t * p1.x;
+                        const y = (1 - t) * (1 - t) * p0.y + 2 * (1 - t) * t * ((p0.y + p1.y) / 2) + t * t * p1.y;
+                        interpolated.push({ x, y });
+                    }
+                }
+            }
+
+            interpolated.push(points[points.length - 1]);
+            return interpolated;
+        }
+
+        function hexToRgb(hex) {
+            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            return result ? {
+                r: parseInt(result[1], 16),
+                g: parseInt(result[2], 16),
+                b: parseInt(result[3], 16)
+            } : { r: 255, g: 0, b: 0 };
+        }
+
+        function displayResults() {
+            const samplingInterval = document.getElementById('samplingInterval').value;
+            const interpolationType = document.getElementById('interpolation').value;
+            
+            document.getElementById('pointCount').textContent = extractedData.points.length.toLocaleString();
+            
+            let precisionText = `${samplingInterval}px`;
+            if (interpolationType !== 'none') {
+                precisionText += ` + ${interpolationType}`;
+            }
+            document.getElementById('precision').textContent = precisionText;
+            
+            document.getElementById('yRange').textContent = 
+                `${Math.round(extractedData.yMin)} ~ ${Math.round(extractedData.yMax)}`;
+            
+            document.getElementById('xRange').textContent = 
+                `${Math.round(extractedData.xMin)} ~ ${Math.round(extractedData.xMax)}`;
+
+            drawOverlay();
+            document.getElementById('resultSection').classList.add('active');
+        }
+
+        function drawOverlay() {
+            overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+
+            if (!extractedData || extractedData.points.length === 0) return;
+
+            overlayCtx.strokeStyle = '#00ff00';
+            overlayCtx.lineWidth = 3;
+            overlayCtx.shadowColor = 'rgba(0, 255, 0, 0.5)';
+            overlayCtx.shadowBlur = 6;
+
+            overlayCtx.beginPath();
+            extractedData.points.forEach((point, i) => {
+                const x = point.x;
+                const y = point.y; // Y축 뒤집기 제거
+
+                if (i === 0) {
+                    overlayCtx.moveTo(x, y);
+                } else {
+                    overlayCtx.lineTo(x, y);
+                }
+
+                if (i % 20 === 0) {
+                    overlayCtx.fillStyle = '#00ff00';
+                    overlayCtx.fillRect(x - 2, y - 2, 4, 4);
+                }
+            });
+            overlayCtx.stroke();
+
+            overlayCtx.shadowColor = 'transparent';
+            overlayCtx.shadowBlur = 0;
+
+            const samplingInterval = document.getElementById('samplingInterval').value;
+            const interpolationType = document.getElementById('interpolation').value;
+            
+            overlayCtx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+            overlayCtx.fillRect(10, 10, 240, 95);
+            overlayCtx.fillStyle = '#00ff00';
+            overlayCtx.font = 'bold 14px monospace';
+            overlayCtx.fillText('추출된 그래프 (녹색)', 20, 32);
+            overlayCtx.font = '11px monospace';
+            overlayCtx.fillStyle = 'white';
+            overlayCtx.fillText(`포인트: ${extractedData.points.length.toLocaleString()}개`, 20, 50);
+            overlayCtx.fillText(`샘플링: ${samplingInterval}px`, 20, 66);
+            overlayCtx.fillText(`보간: ${interpolationType === 'none' ? '없음' : interpolationType}`, 20, 82);
+        }
+
+        function downloadSVG() {
+            const svg = generateSVG();
+            const blob = new Blob([svg], { type: 'image/svg+xml' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'graph-extracted.svg';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function downloadJSON() {
+            const json = JSON.stringify(extractedData, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'graph-data.json';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function generateSVG() {
+            // 캔버스의 실제 크기와 aspect ratio 사용
+            const canvasWidth = extractedData.width;
+            const canvasHeight = extractedData.height;
+            const aspectRatio = canvasWidth / canvasHeight;
+            
+            // SVG 크기 설정 (캔버스와 동일한 aspect ratio 유지)
+            let svgWidth = canvasWidth;
+            let svgHeight = canvasHeight;
+            
+            // 너무 크면 스케일 다운 (최대 1920px 기준)
+            const maxDimension = 1920;
+            if (svgWidth > maxDimension || svgHeight > maxDimension) {
+                if (svgWidth > svgHeight) {
+                    svgWidth = maxDimension;
+                    svgHeight = maxDimension / aspectRatio;
+                } else {
+                    svgHeight = maxDimension;
+                    svgWidth = maxDimension * aspectRatio;
+                }
+            }
+
+            const padding = 0; // 패딩 제거하여 실제 그래프와 동일하게
+
+            const xRange = extractedData.xMax - extractedData.xMin;
+            const yRange = extractedData.yMax - extractedData.yMin;
+
+            const lineColor = document.getElementById('svgLineColor').value;
+            const lineWidth = document.getElementById('svgLineWidth').value;
+
+            // Path 데이터 생성
+            let pathData = '';
+            extractedData.points.forEach((point, i) => {
+                // 원본 좌표를 SVG 좌표계로 변환 (Y축 뒤집기 제거)
+                const x = (point.x / canvasWidth) * svgWidth;
+                const y = (point.y / canvasHeight) * svgHeight;
+
+                if (i === 0) {
+                    pathData += `M ${x.toFixed(3)} ${y.toFixed(3)}`;
+                } else {
+                    pathData += ` L ${x.toFixed(3)} ${y.toFixed(3)}`;
+                }
+            });
+
+            // SVG 생성 (viewBox 추가로 Illustrator 호환성 향상)
+            return `<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg width="${svgWidth.toFixed(0)}" height="${svgHeight.toFixed(0)}" 
+     viewBox="0 0 ${svgWidth.toFixed(0)} ${svgHeight.toFixed(0)}" 
+     xmlns="http://www.w3.org/2000/svg" 
+     xmlns:xlink="http://www.w3.org/1999/xlink" 
+     version="1.1">
+  <title>Extracted Graph - ${extractedData.points.length} points</title>
+  <desc>Y Range: ${Math.round(extractedData.yMin)} ~ ${Math.round(extractedData.yMax)}, X Range: ${Math.round(extractedData.xMin)} ~ ${Math.round(extractedData.xMax)}</desc>
+  <g id="graph-layer">
+    <path 
+      d="${pathData}" 
+      stroke="${lineColor}" 
+      stroke-width="${lineWidth}" 
+      fill="none" 
+      stroke-linecap="round" 
+      stroke-linejoin="round"
+      vector-effect="non-scaling-stroke"/>
+  </g>
+</svg>`;
+        }
+
+        function copyData() {
+            const text = JSON.stringify(extractedData, null, 2);
+            navigator.clipboard.writeText(text).then(() => {
+                alert('데이터가 클립보드에 복사되었습니다!');
+            }).catch(() => {
+                alert('복사 실패. 브라우저가 클립보드 접근을 허용하지 않습니다.');
+            });
+        }
+
+        function clearGraph() {
+            if (!extractedData) return;
+            
+            if (!confirm('그려진 그래프를 지우시겠습니까?')) return;
+            
+            // 오버레이 캔버스만 지우기 (원본 이미지는 유지)
+            overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+            
+            // 추출 데이터 초기화
+            extractedData = null;
+            
+            // 결과 섹션 숨기기
+            document.getElementById('resultSection').classList.remove('active');
+        }
+
+        function showLoading(show) {
+            document.getElementById('loading').classList.toggle('active', show);
+            document.getElementById('extractBtn').disabled = show;
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+            errorDiv.classList.add('active');
+        }
+
+        function hideError() {
+            document.getElementById('error').classList.remove('active');
+        }
+
+        function resetAll() {
+            if (!confirm('모든 데이터를 초기화하시겠습니까?')) return;
+
+            imageData = null;
+            extractedData = null;
+            mainCtx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
+            overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+            document.getElementById('resultSection').classList.remove('active');
+            document.getElementById('fileInput').value = '';
+            document.getElementById('extractBtn').disabled = true;
+            hideError();
+        }
+
+        async function downloadPSD() {
+            if (!extractedData) {
+                alert('먼저 그래프를 추출해주세요.');
+                return;
+            }
+
+            try {
+                // 캔버스 크기
+                const canvasWidth = extractedData.width;
+                const canvasHeight = extractedData.height;
+                
+                // 선 색상 및 두께
+                const lineColor = document.getElementById('svgLineColor').value;
+                const lineWidth = document.getElementById('svgLineWidth').value;
+                
+                // SVG path 데이터 생성
+                let pathData = '';
+                extractedData.points.forEach((point, i) => {
+                    const x = point.x.toFixed(3);
+                    const y = point.y.toFixed(3);
+                    
+                    if (i === 0) {
+                        pathData += `M ${x} ${y}`;
+                    } else {
+                        pathData += ` L ${x} ${y}`;
+                    }
+                });
+
+                // 단순하고 깨끗한 SVG 생성 (단일 path만)
+                const svgContent = `<?xml version="1.0" encoding="UTF-8"?>
+<svg width="${canvasWidth}" height="${canvasHeight}" viewBox="0 0 ${canvasWidth} ${canvasHeight}" xmlns="http://www.w3.org/2000/svg">
+  <path id="graph-path" d="${pathData}" stroke="${lineColor}" stroke-width="${lineWidth}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>`;
+
+                // SVG를 Blob으로 변환
+                const svgBlob = new Blob([svgContent], { type: 'image/svg+xml;charset=utf-8' });
+                const svgUrl = URL.createObjectURL(svgBlob);
+                
+                // Base64 인코딩
+                const svgBase64 = btoa(unescape(encodeURIComponent(svgContent)));
+
+                // Photopea 열기
+                const width = 1400;
+                const height = 900;
+                const left = (screen.width - width) / 2;
+                const top = (screen.height - height) / 2;
+                
+                // Photopea URL에 SVG를 직접 전달
+                const photopeaUrl = `https://www.photopea.com#%7B%22files%22%3A%5B%22data%3Aimage%2Fsvg%2Bxml%3Bbase64%2C${svgBase64}%22%5D%7D`;
+                
+                const photopeaWindow = window.open(
+                    photopeaUrl,
+                    'Photopea',
+                    `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`
+                );
+
+                if (!photopeaWindow) {
+                    alert('팝업이 차단되었습니다. 팝업 허용 후 다시 시도해주세요.');
+                    return;
+                }
+
+                // URL 정리
+                setTimeout(() => {
+                    URL.revokeObjectURL(svgUrl);
+                }, 1000);
+
+                // 사용자에게 안내 메시지
+                setTimeout(() => {
+                    alert('✅ Photopea가 새 창에서 열립니다!\n\n' +
+                          '📐 단일 벡터 패스 레이어로 생성됨\n' +
+                          '🎨 레이어 이름: "graph-path"\n\n' +
+                          '💾 저장 방법:\n' +
+                          '• File > Export As > PSD\n' +
+                          '• 또는 Ctrl+S (Mac: Cmd+S)\n\n' +
+                          '💡 팁:\n' +
+                          '• 벡터 패스이므로 무손실 편집 가능\n' +
+                          '• Direct Selection Tool로 포인트 편집\n' +
+                          '• Stroke/Fill 설정 변경 가능');
+                }, 500);
+
+            } catch (error) {
+                console.error('PSD 생성 오류:', error);
+                alert('PSD 생성 중 오류가 발생했습니다: ' + error.message);
+            }
+        }
+    </script>
+</body>
+</html>
