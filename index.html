@@ -207,14 +207,6 @@
             100% { transform: rotate(360deg); }
         }
 
-        .result-section {
-            display: none;
-        }
-
-        .result-section.active {
-            display: block;
-        }
-
         .stats-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -269,8 +261,54 @@
         .content-area {
             padding: 20px;
             display: flex;
+            flex-direction: column;
             justify-content: center;
             align-items: center;
+        }
+
+        .result-overlay {
+            width: 100%;
+            max-width: 1000px;
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            display: none;
+        }
+
+        .result-overlay.active {
+            display: block;
+        }
+
+        .result-overlay h3 {
+            font-size: 18px;
+            margin-bottom: 15px;
+            color: #333;
+            font-weight: 600;
+        }
+
+        .result-overlay .input-group {
+            margin-bottom: 12px;
+        }
+
+        .svg-settings {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .result-buttons {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .result-buttons .btn {
+            width: 100%;
+            margin-bottom: 0;
         }
 
         #fileInput {
@@ -432,6 +470,17 @@
                     </div>
                 </div>
 
+                <!-- Extract Button -->
+                <div class="section">
+                    <button class="btn btn-primary" id="extractBtn" disabled>
+                        🚀 그래프 추출 시작
+                    </button>
+                    <div class="loading" id="loading">
+                        <div class="spinner"></div>
+                        <p style="font-size: 12px;">픽셀 분석 중...</p>
+                    </div>
+                </div>
+
                 <!-- Settings -->
                 <div class="section">
                     <h3>⚙️ 추출 설정</h3>
@@ -495,19 +544,12 @@
                     </div>
                 </div>
 
-                <!-- Extract Button -->
-                <div class="section">
-                    <button class="btn btn-primary" id="extractBtn" disabled>
-                        🚀 그래프 추출 시작
-                    </button>
-                    <div class="loading" id="loading">
-                        <div class="spinner"></div>
-                        <p style="font-size: 12px;">픽셀 분석 중...</p>
-                    </div>
-                </div>
+                <div class="error" id="error"></div>
+            </div>
 
-                <!-- Results -->
-                <div class="section result-section" id="resultSection">
+            <div class="content-area">
+                <!-- Results - 추출 완료 후 캔버스 위에 표시 -->
+                <div class="result-overlay" id="resultSection">
                     <h3>✅ 추출 완료</h3>
                     <div class="stats-grid">
                         <div class="stat-card">
@@ -530,40 +572,40 @@
                         </div>
                     </div>
 
-                    <div class="input-group">
-                        <label>SVG 선 색상</label>
-                        <input type="color" id="svgLineColor" value="#e74c3c">
+                    <div class="svg-settings">
+                        <div class="input-group">
+                            <label>SVG 선 색상</label>
+                            <input type="color" id="svgLineColor" value="#e74c3c">
+                        </div>
+
+                        <div class="input-group">
+                            <label>SVG 선 두께</label>
+                            <input type="number" id="svgLineWidth" value="2" min="0.5" max="10" step="0.5">
+                        </div>
                     </div>
 
-                    <div class="input-group">
-                        <label>SVG 선 두께</label>
-                        <input type="number" id="svgLineWidth" value="2" min="0.5" max="10" step="0.5">
+                    <div class="result-buttons">
+                        <button class="btn btn-success" onclick="downloadSVG()">
+                            ⬇ SVG 다운로드
+                        </button>
+                        <button class="btn btn-success" onclick="downloadPSD()">
+                            🎨 PSD 다운로드 (Photopea)
+                        </button>
+                        <button class="btn btn-secondary" onclick="downloadJSON()">
+                            📄 JSON 다운로드
+                        </button>
+                        <button class="btn btn-secondary" onclick="copyData()">
+                            📋 데이터 복사
+                        </button>
+                        <button class="btn btn-danger" onclick="clearGraph()">
+                            🗑️ 그려진 그래프 지우기
+                        </button>
+                        <button class="btn btn-secondary" onclick="resetAll()">
+                            🔄 전체 초기화
+                        </button>
                     </div>
-
-                    <button class="btn btn-success" onclick="downloadSVG()">
-                        ⬇ SVG 다운로드
-                    </button>
-                    <button class="btn btn-success" onclick="downloadPSD()">
-                        🎨 PSD 다운로드 (Photopea)
-                    </button>
-                    <button class="btn btn-secondary" onclick="downloadJSON()">
-                        📄 JSON 다운로드
-                    </button>
-                    <button class="btn btn-secondary" onclick="copyData()">
-                        📋 데이터 복사
-                    </button>
-                    <button class="btn btn-danger" onclick="clearGraph()">
-                        🗑️ 그려진 그래프 지우기
-                    </button>
-                    <button class="btn btn-secondary" onclick="resetAll()">
-                        🔄 전체 초기화
-                    </button>
                 </div>
 
-                <div class="error" id="error"></div>
-            </div>
-
-            <div class="content-area">
                 <div class="canvas-wrapper" id="canvasWrapper">
                     <canvas id="mainCanvas"></canvas>
                     <canvas id="overlayCanvas"></canvas>
@@ -1108,7 +1150,14 @@
                 `${Math.round(extractedData.xMin)} ~ ${Math.round(extractedData.xMax)}`;
 
             drawOverlay();
-            document.getElementById('resultSection').classList.add('active');
+            
+            const resultSection = document.getElementById('resultSection');
+            resultSection.classList.add('active');
+            
+            // 결과 섹션으로 부드럽게 스크롤
+            setTimeout(() => {
+                resultSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 100);
         }
 
         function drawOverlay() {
