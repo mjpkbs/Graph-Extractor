@@ -349,6 +349,68 @@
             left: 0;
             pointer-events: none;
         }
+
+        .color-config {
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 12px;
+            position: relative;
+        }
+
+        .color-config-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .color-config-name {
+            font-weight: 600;
+            font-size: 13px;
+            color: #333;
+        }
+
+        .btn-remove {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            cursor: pointer;
+        }
+
+        .btn-remove:hover {
+            background: #c0392b;
+        }
+
+        .btn-add {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            width: 100%;
+            font-weight: 600;
+        }
+
+        .btn-add:hover {
+            background: #2980b9;
+        }
+
+        .color-preview {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+            border: 2px solid #ddd;
+            vertical-align: middle;
+            margin-right: 8px;
+        }
     </style>
 </head>
 <body>
@@ -375,22 +437,19 @@
                     <h3>⚙️ 추출 설정</h3>
                     
                     <div class="input-group">
-                        <label>🎨 선 색상</label>
-                        <div class="color-picker-group">
-                            <input type="color" id="targetColor" value="#ff0000">
-                            <input type="number" id="colorTolerance" value="40" min="0" max="100" placeholder="허용오차" title="색상 허용 오차">
-                        </div>
-                        <small style="color: #666; font-size: 11px;">색상 선택 후 허용오차 조정 (기본: 40)</small>
+                        <label>🎨 추출할 그래프 색상</label>
+                        <div id="colorConfigList"></div>
+                        <button class="btn-add" onclick="addColorConfig()">+ 색상 추가</button>
                     </div>
 
                     <div class="input-group">
                         <label>📏 샘플링 간격</label>
                         <select id="samplingInterval">
                             <option value="0.1">0.1픽셀 (극초정밀 - 매우 느림)</option>
-                            <option value="0.25">0.25픽셀 (극정밀)</option>
+                            <option value="0.25" selected>0.25픽셀 (극정밀)</option>
                             <option value="0.5">0.5픽셀 (서브픽셀 정밀)</option>
                             <option value="1">1픽셀마다 (초정밀)</option>
-                            <option value="2" selected>2픽셀마다 (정밀)</option>
+                            <option value="2">2픽셀마다 (정밀)</option>
                             <option value="5">5픽셀마다 (빠름)</option>
                         </select>
                     </div>
@@ -398,9 +457,9 @@
                     <div class="input-group">
                         <label>📈 곡선 보간</label>
                         <select id="interpolation">
-                            <option value="none">없음 (원본 그대로)</option>
+                            <option value="none" selected>없음 (원본 그대로)</option>
                             <option value="linear">선형 보간 (2배)</option>
-                            <option value="catmull" selected>Catmull-Rom (4배)</option>
+                            <option value="catmull">Catmull-Rom (4배)</option>
                             <option value="bezier">베지어 곡선 (8배)</option>
                         </select>
                     </div>
@@ -413,17 +472,26 @@
                         </select>
                     </div>
 
+                    <div class="input-group">
+                        <label style="display: flex; align-items: center; cursor: pointer;">
+                            <input type="checkbox" id="separateGraphs" style="width: auto; margin-right: 8px;">
+                            <span>🎨 색상마다 그래프 따로 생성</span>
+                        </label>
+                        <small style="color: #666; font-size: 11px; margin-top: 4px; display: block;">
+                            체크: 색상별 레이어 분리 / 체크 안 함: 단일 path 병합
+                        </small>
+                    </div>
+
                     <div class="info-box">
                         <strong>💡 팁:</strong><br>
-                        • 빨간색 차트 → 색상: #ff0000<br>
-                        • 분홍색 차트 → 색상: #ff69b4<br>
-                        • 파란색 차트 → 색상: #0000ff<br>
+                        • 여러 색상을 동시에 추출 가능<br>
+                        • 빨간색 차트 → #ff0000<br>
+                        • 파란색 차트 → #0000ff<br>
+                        • 각 색상마다 허용오차 조정<br>
                         <br>
                         <strong>🎯 정밀도:</strong><br>
-                        • 0.1픽셀 = 10,000+ 포인트<br>
                         • 0.25픽셀 = 4,000+ 포인트<br>
-                        • Catmull-Rom = 부드러운 곡선<br>
-                        • 베지어 = 매우 부드러운 곡선
+                        • 보간 없음 = 원본 데이터 유지
                     </div>
                 </div>
 
@@ -508,12 +576,25 @@
         let imageData = null;
         let extractedData = null;
         let mainCanvas, overlayCanvas, mainCtx, overlayCtx;
+        let colorConfigs = [];
+        let nextColorId = 1;
+
+        // 기본 색상 프리셋
+        const colorPresets = [
+            { name: '빨간색', color: '#ff0000', displayColor: '#00ff00' },
+            { name: '파란색', color: '#0000ff', displayColor: '#00ffff' },
+            { name: '녹색', color: '#00ff00', displayColor: '#ff00ff' },
+            { name: '분홍색', color: '#ff69b4', displayColor: '#ffff00' }
+        ];
 
         window.onload = function() {
             mainCanvas = document.getElementById('mainCanvas');
             overlayCanvas = document.getElementById('overlayCanvas');
             mainCtx = mainCanvas.getContext('2d', { willReadFrequently: true });
             overlayCtx = overlayCanvas.getContext('2d');
+
+            // 기본 색상 추가 (빨간색)
+            addColorConfig('#ff0000', '빨간색', 40);
 
             setupEventListeners();
         };
@@ -544,6 +625,86 @@
             });
 
             document.getElementById('extractBtn').addEventListener('click', extractGraph);
+        }
+
+        function addColorConfig(color = null, name = null, tolerance = 40) {
+            const id = nextColorId++;
+            
+            // 자동 색상 선택
+            if (!color) {
+                const presetIndex = colorConfigs.length % colorPresets.length;
+                color = colorPresets[presetIndex].color;
+                name = colorPresets[presetIndex].name;
+            }
+            
+            // 표시용 색상 자동 선택 (추출된 그래프 오버레이 색상)
+            const displayColors = ['#00ff00', '#00ffff', '#ff00ff', '#ffff00', '#ff8800', '#00ff88'];
+            const displayColor = displayColors[colorConfigs.length % displayColors.length];
+            
+            const config = {
+                id: id,
+                name: name || `그래프 ${id}`,
+                color: color,
+                tolerance: tolerance,
+                displayColor: displayColor
+            };
+            
+            colorConfigs.push(config);
+            renderColorConfigs();
+        }
+
+        function removeColorConfig(id) {
+            colorConfigs = colorConfigs.filter(c => c.id !== id);
+            renderColorConfigs();
+        }
+
+        function renderColorConfigs() {
+            const container = document.getElementById('colorConfigList');
+            container.innerHTML = '';
+            
+            colorConfigs.forEach((config, index) => {
+                const div = document.createElement('div');
+                div.className = 'color-config';
+                div.innerHTML = `
+                    <div class="color-config-header">
+                        <div class="color-config-name">
+                            <span class="color-preview" style="background-color: ${config.color}"></span>
+                            ${config.name}
+                        </div>
+                        ${colorConfigs.length > 1 ? `<button class="btn-remove" onclick="removeColorConfig(${config.id})">삭제</button>` : ''}
+                    </div>
+                    <div class="input-group" style="margin-bottom: 8px;">
+                        <label style="font-size: 12px;">이름</label>
+                        <input type="text" value="${config.name}" 
+                               onchange="updateColorConfig(${config.id}, 'name', this.value)"
+                               style="padding: 6px; font-size: 12px;">
+                    </div>
+                    <div class="input-group" style="margin-bottom: 8px;">
+                        <label style="font-size: 12px;">색상</label>
+                        <input type="color" value="${config.color}" 
+                               onchange="updateColorConfig(${config.id}, 'color', this.value)"
+                               style="height: 36px;">
+                    </div>
+                    <div class="input-group" style="margin-bottom: 0;">
+                        <label style="font-size: 12px;">허용오차 (${config.tolerance})</label>
+                        <input type="range" min="0" max="100" value="${config.tolerance}" 
+                               oninput="updateColorConfig(${config.id}, 'tolerance', this.value)">
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function updateColorConfig(id, field, value) {
+            const config = colorConfigs.find(c => c.id === id);
+            if (config) {
+                if (field === 'tolerance') {
+                    config[field] = parseInt(value);
+                } else {
+                    config[field] = value;
+                }
+                renderColorConfigs();
+            }
         }
 
         function handleFileSelect(event) {
@@ -607,82 +768,191 @@
                 return;
             }
 
+            if (colorConfigs.length === 0) {
+                showError('최소 1개의 색상을 추가하세요.');
+                return;
+            }
+
             showLoading(true);
             hideError();
 
             await new Promise(resolve => setTimeout(resolve, 100));
 
             try {
-                const targetColor = hexToRgb(document.getElementById('targetColor').value);
-                const tolerance = parseInt(document.getElementById('colorTolerance').value);
                 const samplingInterval = parseFloat(document.getElementById('samplingInterval').value);
                 const scanDirection = document.getElementById('scanDirection').value;
                 const interpolationType = document.getElementById('interpolation').value;
+                const separateGraphs = document.getElementById('separateGraphs').checked;
 
-                const points = [];
                 const width = imageData.width;
                 const height = imageData.height;
 
-                if (scanDirection === 'horizontal') {
-                    for (let x = 0; x < width; x += samplingInterval) {
-                        let bestY = -1;
-                        let bestMatch = Infinity;
+                if (separateGraphs) {
+                    // 색상별로 별도 그래프 생성
+                    const graphsData = [];
 
-                        for (let y = 0; y < height; y++) {
-                            const color = getPixelColor(x, y);
-                            const diff = colorDistance(color, targetColor);
-                            
-                            if (diff < tolerance && diff < bestMatch) {
-                                bestMatch = diff;
-                                bestY = y;
+                    for (const config of colorConfigs) {
+                        const targetColor = hexToRgb(config.color);
+                        const tolerance = config.tolerance;
+                        const points = [];
+
+                        if (scanDirection === 'horizontal') {
+                            for (let x = 0; x < width; x += samplingInterval) {
+                                let bestY = -1;
+                                let bestMatch = Infinity;
+
+                                for (let y = 0; y < height; y++) {
+                                    const color = getPixelColor(x, y);
+                                    const diff = colorDistance(color, targetColor);
+                                    
+                                    if (diff < tolerance && diff < bestMatch) {
+                                        bestMatch = diff;
+                                        bestY = y;
+                                    }
+                                }
+
+                                if (bestY !== -1) {
+                                    points.push({ x: x, y: bestY });
+                                }
+                            }
+                        } else {
+                            for (let y = 0; y < height; y += samplingInterval) {
+                                let bestX = -1;
+                                let bestMatch = Infinity;
+
+                                for (let x = 0; x < width; x++) {
+                                    const color = getPixelColor(x, y);
+                                    const diff = colorDistance(color, targetColor);
+                                    
+                                    if (diff < tolerance && diff < bestMatch) {
+                                        bestMatch = diff;
+                                        bestX = x;
+                                    }
+                                }
+
+                                if (bestX !== -1) {
+                                    points.push({ x: bestX, y: y });
+                                }
                             }
                         }
 
-                        if (bestY !== -1) {
-                            points.push({ x: x, y: bestY });
+                        if (points.length > 0) {
+                            const interpolatedPoints = interpolatePoints(points, interpolationType);
+                            const yValues = interpolatedPoints.map(p => p.y);
+                            const xValues = interpolatedPoints.map(p => p.x);
+
+                            graphsData.push({
+                                name: config.name,
+                                color: config.color,
+                                displayColor: config.displayColor,
+                                points: interpolatedPoints,
+                                yMin: Math.min(...yValues),
+                                yMax: Math.max(...yValues),
+                                xMin: Math.min(...xValues),
+                                xMax: Math.max(...xValues)
+                            });
                         }
                     }
+
+                    if (graphsData.length === 0) {
+                        showError('그래프를 찾을 수 없습니다. 색상과 허용오차를 조정해보세요.');
+                        showLoading(false);
+                        return;
+                    }
+
+                    // 전체 범위 계산
+                    const allYValues = graphsData.flatMap(g => [g.yMin, g.yMax]);
+                    const allXValues = graphsData.flatMap(g => [g.xMin, g.xMax]);
+
+                    extractedData = {
+                        mode: 'separate',
+                        graphs: graphsData,
+                        yMin: Math.min(...allYValues),
+                        yMax: Math.max(...allYValues),
+                        xMin: Math.min(...allXValues),
+                        xMax: Math.max(...allXValues),
+                        width: width,
+                        height: height
+                    };
                 } else {
-                    for (let y = 0; y < height; y += samplingInterval) {
-                        let bestX = -1;
-                        let bestMatch = Infinity;
+                    // 모든 색상을 하나의 그래프로 병합
+                    const allPoints = [];
 
-                        for (let x = 0; x < width; x++) {
-                            const color = getPixelColor(x, y);
-                            const diff = colorDistance(color, targetColor);
-                            
-                            if (diff < tolerance && diff < bestMatch) {
-                                bestMatch = diff;
-                                bestX = x;
+                    if (scanDirection === 'horizontal') {
+                        for (let x = 0; x < width; x += samplingInterval) {
+                            let bestY = -1;
+                            let bestMatch = Infinity;
+
+                            for (let y = 0; y < height; y++) {
+                                const color = getPixelColor(x, y);
+                                
+                                // 모든 색상 설정에 대해 체크
+                                for (const config of colorConfigs) {
+                                    const targetColor = hexToRgb(config.color);
+                                    const tolerance = config.tolerance;
+                                    const diff = colorDistance(color, targetColor);
+                                    
+                                    if (diff < tolerance && diff < bestMatch) {
+                                        bestMatch = diff;
+                                        bestY = y;
+                                    }
+                                }
+                            }
+
+                            if (bestY !== -1) {
+                                allPoints.push({ x: x, y: bestY });
                             }
                         }
+                    } else {
+                        for (let y = 0; y < height; y += samplingInterval) {
+                            let bestX = -1;
+                            let bestMatch = Infinity;
 
-                        if (bestX !== -1) {
-                            points.push({ x: bestX, y: y });
+                            for (let x = 0; x < width; x++) {
+                                const color = getPixelColor(x, y);
+                                
+                                // 모든 색상 설정에 대해 체크
+                                for (const config of colorConfigs) {
+                                    const targetColor = hexToRgb(config.color);
+                                    const tolerance = config.tolerance;
+                                    const diff = colorDistance(color, targetColor);
+                                    
+                                    if (diff < tolerance && diff < bestMatch) {
+                                        bestMatch = diff;
+                                        bestX = x;
+                                    }
+                                }
+                            }
+
+                            if (bestX !== -1) {
+                                allPoints.push({ x: bestX, y: y });
+                            }
                         }
                     }
+
+                    if (allPoints.length === 0) {
+                        showError('그래프를 찾을 수 없습니다. 색상과 허용오차를 조정해보세요.');
+                        showLoading(false);
+                        return;
+                    }
+
+                    // 단일 그래프로 병합
+                    const interpolatedPoints = interpolatePoints(allPoints, interpolationType);
+                    const yValues = interpolatedPoints.map(p => p.y);
+                    const xValues = interpolatedPoints.map(p => p.x);
+
+                    extractedData = {
+                        mode: 'merged',
+                        points: interpolatedPoints,
+                        yMin: Math.min(...yValues),
+                        yMax: Math.max(...yValues),
+                        xMin: Math.min(...xValues),
+                        xMax: Math.max(...xValues),
+                        width: width,
+                        height: height,
+                        colorCount: colorConfigs.length
+                    };
                 }
-
-                if (points.length === 0) {
-                    showError('그래프를 찾을 수 없습니다. 색상과 허용오차를 조정해보세요.');
-                    showLoading(false);
-                    return;
-                }
-
-                const interpolatedPoints = interpolatePoints(points, interpolationType);
-
-                const yValues = interpolatedPoints.map(p => p.y);
-                const xValues = interpolatedPoints.map(p => p.x);
-
-                extractedData = {
-                    points: interpolatedPoints,
-                    yMin: Math.min(...yValues),
-                    yMax: Math.max(...yValues),
-                    xMin: Math.min(...xValues),
-                    xMax: Math.max(...xValues),
-                    width: width,
-                    height: height
-                };
 
                 displayResults();
                 showLoading(false);
@@ -818,7 +1088,12 @@
             const samplingInterval = document.getElementById('samplingInterval').value;
             const interpolationType = document.getElementById('interpolation').value;
             
-            document.getElementById('pointCount').textContent = extractedData.points.length.toLocaleString();
+            if (extractedData.mode === 'separate') {
+                const totalPoints = extractedData.graphs.reduce((sum, g) => sum + g.points.length, 0);
+                document.getElementById('pointCount').textContent = totalPoints.toLocaleString();
+            } else {
+                document.getElementById('pointCount').textContent = extractedData.points.length.toLocaleString();
+            }
             
             let precisionText = `${samplingInterval}px`;
             if (interpolationType !== 'none') {
@@ -839,47 +1114,109 @@
         function drawOverlay() {
             overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
 
-            if (!extractedData || extractedData.points.length === 0) return;
-
-            overlayCtx.strokeStyle = '#00ff00';
-            overlayCtx.lineWidth = 3;
-            overlayCtx.shadowColor = 'rgba(0, 255, 0, 0.5)';
-            overlayCtx.shadowBlur = 6;
-
-            overlayCtx.beginPath();
-            extractedData.points.forEach((point, i) => {
-                const x = point.x;
-                const y = point.y; // Y축 뒤집기 제거
-
-                if (i === 0) {
-                    overlayCtx.moveTo(x, y);
-                } else {
-                    overlayCtx.lineTo(x, y);
-                }
-
-                if (i % 20 === 0) {
-                    overlayCtx.fillStyle = '#00ff00';
-                    overlayCtx.fillRect(x - 2, y - 2, 4, 4);
-                }
-            });
-            overlayCtx.stroke();
-
-            overlayCtx.shadowColor = 'transparent';
-            overlayCtx.shadowBlur = 0;
+            if (!extractedData) return;
 
             const samplingInterval = document.getElementById('samplingInterval').value;
             const interpolationType = document.getElementById('interpolation').value;
-            
-            overlayCtx.fillStyle = 'rgba(0, 0, 0, 0.75)';
-            overlayCtx.fillRect(10, 10, 240, 95);
-            overlayCtx.fillStyle = '#00ff00';
-            overlayCtx.font = 'bold 14px monospace';
-            overlayCtx.fillText('추출된 그래프 (녹색)', 20, 32);
-            overlayCtx.font = '11px monospace';
-            overlayCtx.fillStyle = 'white';
-            overlayCtx.fillText(`포인트: ${extractedData.points.length.toLocaleString()}개`, 20, 50);
-            overlayCtx.fillText(`샘플링: ${samplingInterval}px`, 20, 66);
-            overlayCtx.fillText(`보간: ${interpolationType === 'none' ? '없음' : interpolationType}`, 20, 82);
+
+            if (extractedData.mode === 'separate') {
+                // 색상별 그래프 따로 그리기
+                if (extractedData.graphs.length === 0) return;
+
+                extractedData.graphs.forEach((graph, graphIndex) => {
+                    overlayCtx.strokeStyle = graph.displayColor;
+                    overlayCtx.lineWidth = 3;
+                    overlayCtx.shadowColor = graph.displayColor.replace(')', ', 0.5)').replace('rgb', 'rgba');
+                    overlayCtx.shadowBlur = 6;
+
+                    overlayCtx.beginPath();
+                    graph.points.forEach((point, i) => {
+                        const x = point.x;
+                        const y = point.y;
+
+                        if (i === 0) {
+                            overlayCtx.moveTo(x, y);
+                        } else {
+                            overlayCtx.lineTo(x, y);
+                        }
+
+                        if (i % 20 === 0) {
+                            overlayCtx.fillStyle = graph.displayColor;
+                            overlayCtx.fillRect(x - 2, y - 2, 4, 4);
+                        }
+                    });
+                    overlayCtx.stroke();
+                });
+
+                overlayCtx.shadowColor = 'transparent';
+                overlayCtx.shadowBlur = 0;
+
+                // 정보 박스
+                const boxHeight = 80 + (extractedData.graphs.length * 20);
+                overlayCtx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+                overlayCtx.fillRect(10, 10, 280, boxHeight);
+                
+                overlayCtx.fillStyle = 'white';
+                overlayCtx.font = 'bold 14px monospace';
+                overlayCtx.fillText('추출된 그래프 (분리)', 20, 32);
+                overlayCtx.font = '11px monospace';
+                
+                let yPos = 50;
+                extractedData.graphs.forEach(graph => {
+                    overlayCtx.fillStyle = graph.displayColor;
+                    overlayCtx.fillRect(20, yPos - 8, 12, 12);
+                    overlayCtx.fillStyle = 'white';
+                    overlayCtx.fillText(`${graph.name}: ${graph.points.length.toLocaleString()}개`, 38, yPos);
+                    yPos += 18;
+                });
+                
+                yPos += 5;
+                overlayCtx.fillText(`샘플링: ${samplingInterval}px`, 20, yPos);
+                overlayCtx.fillText(`보간: ${interpolationType === 'none' ? '없음' : interpolationType}`, 20, yPos + 16);
+            } else {
+                // 병합된 단일 그래프 그리기
+                if (extractedData.points.length === 0) return;
+
+                overlayCtx.strokeStyle = '#00ff00';
+                overlayCtx.lineWidth = 3;
+                overlayCtx.shadowColor = 'rgba(0, 255, 0, 0.5)';
+                overlayCtx.shadowBlur = 6;
+
+                overlayCtx.beginPath();
+                extractedData.points.forEach((point, i) => {
+                    const x = point.x;
+                    const y = point.y;
+
+                    if (i === 0) {
+                        overlayCtx.moveTo(x, y);
+                    } else {
+                        overlayCtx.lineTo(x, y);
+                    }
+
+                    if (i % 20 === 0) {
+                        overlayCtx.fillStyle = '#00ff00';
+                        overlayCtx.fillRect(x - 2, y - 2, 4, 4);
+                    }
+                });
+                overlayCtx.stroke();
+
+                overlayCtx.shadowColor = 'transparent';
+                overlayCtx.shadowBlur = 0;
+                
+                overlayCtx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+                overlayCtx.fillRect(10, 10, 260, 110);
+                overlayCtx.fillStyle = '#00ff00';
+                overlayCtx.font = 'bold 14px monospace';
+                overlayCtx.fillText('추출된 그래프 (병합)', 20, 32);
+                overlayCtx.font = '11px monospace';
+                overlayCtx.fillStyle = 'white';
+                overlayCtx.fillText(`포인트: ${extractedData.points.length.toLocaleString()}개`, 20, 50);
+                overlayCtx.fillText(`샘플링: ${samplingInterval}px`, 20, 66);
+                overlayCtx.fillText(`보간: ${interpolationType === 'none' ? '없음' : interpolationType}`, 20, 82);
+                if (extractedData.colorCount > 1) {
+                    overlayCtx.fillText(`추출 색상: ${extractedData.colorCount}개 병합`, 20, 98);
+                }
+            }
         }
 
         function downloadSVG() {
@@ -905,16 +1242,13 @@
         }
 
         function generateSVG() {
-            // 캔버스의 실제 크기와 aspect ratio 사용
             const canvasWidth = extractedData.width;
             const canvasHeight = extractedData.height;
             const aspectRatio = canvasWidth / canvasHeight;
             
-            // SVG 크기 설정 (캔버스와 동일한 aspect ratio 유지)
             let svgWidth = canvasWidth;
             let svgHeight = canvasHeight;
             
-            // 너무 크면 스케일 다운 (최대 1920px 기준)
             const maxDimension = 1920;
             if (svgWidth > maxDimension || svgHeight > maxDimension) {
                 if (svgWidth > svgHeight) {
@@ -926,30 +1260,65 @@
                 }
             }
 
-            const padding = 0; // 패딩 제거하여 실제 그래프와 동일하게
-
-            const xRange = extractedData.xMax - extractedData.xMin;
-            const yRange = extractedData.yMax - extractedData.yMin;
-
             const lineColor = document.getElementById('svgLineColor').value;
             const lineWidth = document.getElementById('svgLineWidth').value;
 
-            // Path 데이터 생성
-            let pathData = '';
-            extractedData.points.forEach((point, i) => {
-                // 원본 좌표를 SVG 좌표계로 변환 (Y축 뒤집기 제거)
-                const x = (point.x / canvasWidth) * svgWidth;
-                const y = (point.y / canvasHeight) * svgHeight;
+            if (extractedData.mode === 'separate') {
+                // 색상별 그래프 따로 생성
+                let pathElements = '';
+                extractedData.graphs.forEach((graph, index) => {
+                    let pathData = '';
+                    graph.points.forEach((point, i) => {
+                        const x = (point.x / canvasWidth) * svgWidth;
+                        const y = (point.y / canvasHeight) * svgHeight;
 
-                if (i === 0) {
-                    pathData += `M ${x.toFixed(3)} ${y.toFixed(3)}`;
-                } else {
-                    pathData += ` L ${x.toFixed(3)} ${y.toFixed(3)}`;
-                }
-            });
+                        if (i === 0) {
+                            pathData += `M ${x.toFixed(3)} ${y.toFixed(3)}`;
+                        } else {
+                            pathData += ` L ${x.toFixed(3)} ${y.toFixed(3)}`;
+                        }
+                    });
 
-            // SVG 생성 (viewBox 추가로 Illustrator 호환성 향상)
-            return `<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+                    pathElements += `  <g id="${graph.name.replace(/\s+/g, '-')}-layer">
+    <path 
+      id="${graph.name.replace(/\s+/g, '-')}-path" 
+      d="${pathData}" 
+      stroke="${graph.color}" 
+      stroke-width="${lineWidth}" 
+      fill="none" 
+      stroke-linecap="round" 
+      stroke-linejoin="round"
+      vector-effect="non-scaling-stroke"/>
+  </g>
+`;
+                });
+
+                const totalPoints = extractedData.graphs.reduce((sum, g) => sum + g.points.length, 0);
+
+                return `<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg width="${svgWidth.toFixed(0)}" height="${svgHeight.toFixed(0)}" 
+     viewBox="0 0 ${svgWidth.toFixed(0)} ${svgHeight.toFixed(0)}" 
+     xmlns="http://www.w3.org/2000/svg" 
+     xmlns:xlink="http://www.w3.org/1999/xlink" 
+     version="1.1">
+  <title>Extracted Graphs - ${extractedData.graphs.length} graphs, ${totalPoints} points</title>
+  <desc>Y Range: ${Math.round(extractedData.yMin)} ~ ${Math.round(extractedData.yMax)}, X Range: ${Math.round(extractedData.xMin)} ~ ${Math.round(extractedData.xMax)}</desc>
+${pathElements}</svg>`;
+            } else {
+                // 단일 병합 그래프 생성
+                let pathData = '';
+                extractedData.points.forEach((point, i) => {
+                    const x = (point.x / canvasWidth) * svgWidth;
+                    const y = (point.y / canvasHeight) * svgHeight;
+
+                    if (i === 0) {
+                        pathData += `M ${x.toFixed(3)} ${y.toFixed(3)}`;
+                    } else {
+                        pathData += ` L ${x.toFixed(3)} ${y.toFixed(3)}`;
+                    }
+                });
+
+                return `<?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <svg width="${svgWidth.toFixed(0)}" height="${svgHeight.toFixed(0)}" 
      viewBox="0 0 ${svgWidth.toFixed(0)} ${svgHeight.toFixed(0)}" 
      xmlns="http://www.w3.org/2000/svg" 
@@ -959,6 +1328,7 @@
   <desc>Y Range: ${Math.round(extractedData.yMin)} ~ ${Math.round(extractedData.yMax)}, X Range: ${Math.round(extractedData.xMin)} ~ ${Math.round(extractedData.xMax)}</desc>
   <g id="graph-layer">
     <path 
+      id="graph-path"
       d="${pathData}" 
       stroke="${lineColor}" 
       stroke-width="${lineWidth}" 
@@ -968,6 +1338,7 @@
       vector-effect="non-scaling-stroke"/>
   </g>
 </svg>`;
+            }
         }
 
         function copyData() {
@@ -1029,37 +1400,57 @@
             }
 
             try {
-                // 캔버스 크기
                 const canvasWidth = extractedData.width;
                 const canvasHeight = extractedData.height;
-                
-                // 선 색상 및 두께
-                const lineColor = document.getElementById('svgLineColor').value;
                 const lineWidth = document.getElementById('svgLineWidth').value;
-                
-                // SVG path 데이터 생성
-                let pathData = '';
-                extractedData.points.forEach((point, i) => {
-                    const x = point.x.toFixed(3);
-                    const y = point.y.toFixed(3);
-                    
-                    if (i === 0) {
-                        pathData += `M ${x} ${y}`;
-                    } else {
-                        pathData += ` L ${x} ${y}`;
-                    }
-                });
 
-                // 단순하고 깨끗한 SVG 생성 (단일 path만)
-                const svgContent = `<?xml version="1.0" encoding="UTF-8"?>
+                let svgContent;
+
+                if (extractedData.mode === 'separate') {
+                    // 색상별 그래프 따로 생성
+                    let pathElements = '';
+                    extractedData.graphs.forEach((graph, index) => {
+                        let pathData = '';
+                        graph.points.forEach((point, i) => {
+                            const x = point.x.toFixed(3);
+                            const y = point.y.toFixed(3);
+                            
+                            if (i === 0) {
+                                pathData += `M ${x} ${y}`;
+                            } else {
+                                pathData += ` L ${x} ${y}`;
+                            }
+                        });
+                        
+                        const layerId = `${graph.name.replace(/\s+/g, '-')}-path`;
+                        pathElements += `  <path id="${layerId}" d="${pathData}" stroke="${graph.color}" stroke-width="${lineWidth}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>\n`;
+                    });
+
+                    svgContent = `<?xml version="1.0" encoding="UTF-8"?>
+<svg width="${canvasWidth}" height="${canvasHeight}" viewBox="0 0 ${canvasWidth} ${canvasHeight}" xmlns="http://www.w3.org/2000/svg">
+${pathElements}</svg>`;
+                } else {
+                    // 단일 병합 그래프 생성
+                    const lineColor = document.getElementById('svgLineColor').value;
+                    
+                    let pathData = '';
+                    extractedData.points.forEach((point, i) => {
+                        const x = point.x.toFixed(3);
+                        const y = point.y.toFixed(3);
+                        
+                        if (i === 0) {
+                            pathData += `M ${x} ${y}`;
+                        } else {
+                            pathData += ` L ${x} ${y}`;
+                        }
+                    });
+
+                    svgContent = `<?xml version="1.0" encoding="UTF-8"?>
 <svg width="${canvasWidth}" height="${canvasHeight}" viewBox="0 0 ${canvasWidth} ${canvasHeight}" xmlns="http://www.w3.org/2000/svg">
   <path id="graph-path" d="${pathData}" stroke="${lineColor}" stroke-width="${lineWidth}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>`;
+                }
 
-                // SVG를 Blob으로 변환
-                const svgBlob = new Blob([svgContent], { type: 'image/svg+xml;charset=utf-8' });
-                const svgUrl = URL.createObjectURL(svgBlob);
-                
                 // Base64 인코딩
                 const svgBase64 = btoa(unescape(encodeURIComponent(svgContent)));
 
@@ -1069,7 +1460,6 @@
                 const left = (screen.width - width) / 2;
                 const top = (screen.height - height) / 2;
                 
-                // Photopea URL에 SVG를 직접 전달
                 const photopeaUrl = `https://www.photopea.com#%7B%22files%22%3A%5B%22data%3Aimage%2Fsvg%2Bxml%3Bbase64%2C${svgBase64}%22%5D%7D`;
                 
                 const photopeaWindow = window.open(
@@ -1083,23 +1473,35 @@
                     return;
                 }
 
-                // URL 정리
-                setTimeout(() => {
-                    URL.revokeObjectURL(svgUrl);
-                }, 1000);
-
                 // 사용자에게 안내 메시지
                 setTimeout(() => {
-                    alert('✅ Photopea가 새 창에서 열립니다!\n\n' +
-                          '📐 단일 벡터 패스 레이어로 생성됨\n' +
-                          '🎨 레이어 이름: "graph-path"\n\n' +
-                          '💾 저장 방법:\n' +
-                          '• File > Export As > PSD\n' +
-                          '• 또는 Ctrl+S (Mac: Cmd+S)\n\n' +
-                          '💡 팁:\n' +
-                          '• 벡터 패스이므로 무손실 편집 가능\n' +
-                          '• Direct Selection Tool로 포인트 편집\n' +
-                          '• Stroke/Fill 설정 변경 가능');
+                    if (extractedData.mode === 'separate') {
+                        const layerNames = extractedData.graphs.map(g => `• ${g.name}`).join('\n');
+                        alert(`✅ Photopea가 새 창에서 열립니다!\n\n` +
+                              `📐 ${extractedData.graphs.length}개의 벡터 패스 레이어로 생성됨:\n${layerNames}\n\n` +
+                              `💾 저장 방법:\n` +
+                              `• File > Export As > PSD\n` +
+                              `• 또는 Ctrl+S (Mac: Cmd+S)\n\n` +
+                              `💡 팁:\n` +
+                              `• 각 레이어는 독립적으로 편집 가능\n` +
+                              `• 벡터 패스이므로 무손실 편집\n` +
+                              `• 레이어별 색상/두께 변경 가능`);
+                    } else {
+                        const colorInfo = extractedData.colorCount > 1 ? 
+                            `${extractedData.colorCount}개 색상이 하나로 병합됨\n` : '';
+                        
+                        alert(`✅ Photopea가 새 창에서 열립니다!\n\n` +
+                              `📐 단일 벡터 패스 레이어로 생성됨\n` +
+                              colorInfo +
+                              `🎨 레이어 이름: "graph-path"\n\n` +
+                              `💾 저장 방법:\n` +
+                              `• File > Export As > PSD\n` +
+                              `• 또는 Ctrl+S (Mac: Cmd+S)\n\n` +
+                              `💡 팁:\n` +
+                              `• 벡터 패스이므로 무손실 편집 가능\n` +
+                              `• Direct Selection Tool로 포인트 편집\n` +
+                              `• Stroke/Fill 설정 변경 가능`);
+                    }
                 }, 500);
 
             } catch (error) {
