@@ -450,6 +450,7 @@
             margin-right: 8px;
         }
     </style>
+    <script src="lib/svg2psd.js"></script>
 </head>
 <body>
     <div class="container">
@@ -589,7 +590,7 @@
                             ⬇ SVG 다운로드
                         </button>
                         <button class="btn btn-success" onclick="downloadPSD()">
-                            🎨 PSD 다운로드 (Photopea)
+                            🎨 PSD 다운로드
                         </button>
                         <button class="btn btn-secondary" onclick="downloadJSON()">
                             📄 JSON 다운로드
@@ -1472,7 +1473,7 @@ ${pathElements}</svg>`;
                         });
                         
                         const layerId = `${graph.name.replace(/\s+/g, '-')}-path`;
-                        pathElements += `  <path id="${layerId}" d="${pathData}" stroke="${graph.color}" stroke-width="${lineWidth}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>\n`;
+                        pathElements += `  <path id="${layerId}" data-name="${graph.name}" d="${pathData}" stroke="${graph.color}" stroke-width="${lineWidth}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>\n`;
                     });
 
                     svgContent = `<?xml version="1.0" encoding="UTF-8"?>
@@ -1496,62 +1497,12 @@ ${pathElements}</svg>`;
 
                     svgContent = `<?xml version="1.0" encoding="UTF-8"?>
 <svg width="${canvasWidth}" height="${canvasHeight}" viewBox="0 0 ${canvasWidth} ${canvasHeight}" xmlns="http://www.w3.org/2000/svg">
-  <path id="graph-path" d="${pathData}" stroke="${lineColor}" stroke-width="${lineWidth}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <path id="graph-path" data-name="graph-path" d="${pathData}" stroke="${lineColor}" stroke-width="${lineWidth}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>`;
                 }
 
-                // Base64 인코딩
-                const svgBase64 = btoa(unescape(encodeURIComponent(svgContent)));
-
-                // Photopea 열기
-                const width = 1400;
-                const height = 900;
-                const left = (screen.width - width) / 2;
-                const top = (screen.height - height) / 2;
-                
-                const photopeaUrl = `https://www.photopea.com#%7B%22files%22%3A%5B%22data%3Aimage%2Fsvg%2Bxml%3Bbase64%2C${svgBase64}%22%5D%7D`;
-                
-                const photopeaWindow = window.open(
-                    photopeaUrl,
-                    'Photopea',
-                    `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`
-                );
-
-                if (!photopeaWindow) {
-                    alert('팝업이 차단되었습니다. 팝업 허용 후 다시 시도해주세요.');
-                    return;
-                }
-
-                // 사용자에게 안내 메시지
-                setTimeout(() => {
-                    if (extractedData.mode === 'separate') {
-                        const layerNames = extractedData.graphs.map(g => `• ${g.name}`).join('\n');
-                        alert(`✅ Photopea가 새 창에서 열립니다!\n\n` +
-                              `📐 ${extractedData.graphs.length}개의 벡터 패스 레이어로 생성됨:\n${layerNames}\n\n` +
-                              `💾 저장 방법:\n` +
-                              `• File > Export As > PSD\n` +
-                              `• 또는 Ctrl+S (Mac: Cmd+S)\n\n` +
-                              `💡 팁:\n` +
-                              `• 각 레이어는 독립적으로 편집 가능\n` +
-                              `• 벡터 패스이므로 무손실 편집\n` +
-                              `• 레이어별 색상/두께 변경 가능`);
-                    } else {
-                        const colorInfo = extractedData.colorCount > 1 ? 
-                            `${extractedData.colorCount}개 색상이 하나로 병합됨\n` : '';
-                        
-                        alert(`✅ Photopea가 새 창에서 열립니다!\n\n` +
-                              `📐 단일 벡터 패스 레이어로 생성됨\n` +
-                              colorInfo +
-                              `🎨 레이어 이름: "graph-path"\n\n` +
-                              `💾 저장 방법:\n` +
-                              `• File > Export As > PSD\n` +
-                              `• 또는 Ctrl+S (Mac: Cmd+S)\n\n` +
-                              `💡 팁:\n` +
-                              `• 벡터 패스이므로 무손실 편집 가능\n` +
-                              `• Direct Selection Tool로 포인트 편집\n` +
-                              `• Stroke/Fill 설정 변경 가능`);
-                    }
-                }, 500);
+                const fileName = `graph_${new Date().getTime()}.psd`;
+                await SVGtoPSD.download(svgContent, fileName);
 
             } catch (error) {
                 console.error('PSD 생성 오류:', error);
